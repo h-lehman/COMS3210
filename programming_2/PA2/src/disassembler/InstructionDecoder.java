@@ -78,10 +78,10 @@ public class InstructionDecoder {
      */
     public void decode(Instruction instruction, int count) {
         //get possible opcodes
-        opcode6 = (instruction.getValue() >>> 26) & 0b111111;    // 6 bits
-        opcode8 = (instruction.getValue() >>> 24) & 0b11111111;   // 8 bits
-        opcode10 = (instruction.getValue() >>> 22) & 0b1111111111; // 10 bits
-        opcode11 = (instruction.getValue() >>> 21) & 0b11111111111; // 11 bits
+        opcode6 = (instruction.getVal() >>> 26) & 0b111111;    // 6 bits
+        opcode8 = (instruction.getVal() >>> 24) & 0b11111111;   // 8 bits
+        opcode10 = (instruction.getVal() >>> 22) & 0b1111111111; // 10 bits
+        opcode11 = (instruction.getVal() >>> 21) & 0b11111111111; // 11 bits
         instruction.setLabel(count);
         matchOpcode();
     }
@@ -104,15 +104,15 @@ public class InstructionDecoder {
      * Builds the instruction string based on the decoded components.
      */
     public void buildInstruction() {
-        Rm = (instruction.getValue() >>> 16) & 0b11111; //get 20-16 bits by putting bit 16 on the LSB and getting the first 5
-        shamt = (instruction.getValue() >>> 10) & 0b111111; //get bits 15-10 by putting bit 10 on the LSB and getting the first 6
-        Rn = (instruction.getValue() >>> 5) & 0b11111; // get bits 9-5 by put bit 5 on the LSB and get the first 5
-        RdRt = instruction.getValue() & 0b11111; // get 5 rightmost bits by getting the first 5
-        ALU_imm = (instruction.getValue() >>> 10) & 0b11111111111; // get bits 21-10 by putting bit 10 on the LSB and getting the first 11
-        DTaddress = (instruction.getValue() >>> 12) & 0b111111111; // get bits 20-12 by putting bit 12 on the LSB and getting the first 9
-        op = (instruction.getValue() >>> 10) & 0b11; // get bits 11-10 by putting bit 10 on the LSB and getting the first 2
-        BRaddress = instruction.getValue() & 0b11111111111111111111111111; // get bits 25-0 by putting bit 0 on the LSB and getting the first 26
-        CondBRaddress = (instruction.getValue() >>> 5) & 0b1111111111111111111; // get bits 23-5 by putting bit 5 on the LSB and getting the first 19
+        Rm = (instruction.getVal() >>> 16) & 0b11111; //get 20-16 bits by putting bit 16 on the LSB and getting the first 5
+        shamt = (instruction.getVal() >>> 10) & 0b111111; //get bits 15-10 by putting bit 10 on the LSB and getting the first 6
+        Rn = (instruction.getVal() >>> 5) & 0b11111; // get bits 9-5 by put bit 5 on the LSB and get the first 5
+        RdRt = instruction.getVal() & 0b11111; // get 5 rightmost bits by getting the first 5
+        ALU_imm = (instruction.getVal() >>> 10) & 0b11111111111; // get bits 21-10 by putting bit 10 on the LSB and getting the first 11
+        DTaddress = (instruction.getVal() >>> 12) & 0b111111111; // get bits 20-12 by putting bit 12 on the LSB and getting the first 9
+        op = (instruction.getVal() >>> 10) & 0b11; // get bits 11-10 by putting bit 10 on the LSB and getting the first 2
+        BRaddress = instruction.getVal() & 0b11111111111111111111111111; // get bits 25-0 by putting bit 0 on the LSB and getting the first 26
+        CondBRaddress = (instruction.getVal() >>> 5) & 0b1111111111111111111; // get bits 23-5 by putting bit 5 on the LSB and getting the first 19
 
         switch (rightInst.getType()) { // check type and print instruction accordingly
             case "R":
@@ -135,7 +135,7 @@ public class InstructionDecoder {
                 instruction.setPrintedInstruction(rightInst.getName() + " X" + RdRt + ", [X" + Rn + ", #" + DTaddress + "]");
                 break;
             case "B":
-                int imm26 = instruction.getValue() & 0x03FFFFFF;  // Extract 26-bit offset
+                int imm26 = instruction.getVal() & 0x03FFFFFF;  // Extract 26-bit offset
                 imm26 = (imm26 << 6) >> 6;  // Sign-extend to 32 bits
                 int targetCount = instruction.getCount() + imm26;
                 instruction.setBranchTarget(targetCount);
@@ -143,13 +143,13 @@ public class InstructionDecoder {
                 instruction.setPrintedInstruction(rightInst.getName() + " label" + targetCount);
                 break;
             case "CB":
-                int imm19 = (instruction.getValue() >>> 5) & 0x7FFFF;  // Extract 19-bit offset
+                int imm19 = (instruction.getVal() >>> 5) & 0x7FFFF;  // Extract 19-bit offset
                 imm19 = (imm19 << 13) >> 13;  // Sign-extend to 32 bits
                 int cbTargetCount = instruction.getCount() + imm19;
                 instruction.setBranchTarget(cbTargetCount);
                 instruction.setBranchTaken(true);
                 if (rightInst.getName().startsWith("B.")) {
-                    String condName = getConditionName(instruction.getValue());
+                    String condName = getConditionName(instruction.getVal());
                     instruction.setPrintedInstruction(condName + " label" + cbTargetCount);
                 } else {
                     instruction.setPrintedInstruction(rightInst.getName() + " X" + RdRt + ", label" + cbTargetCount);
@@ -164,7 +164,7 @@ public class InstructionDecoder {
      * @return condition name
      */
     private String getConditionName(int instructionValue) {
-        int condition = instruction.getValue() & 0b1111; // Extract bits [3:0]
+        int condition = instruction.getVal() & 0b1111; // Extract bits [3:0]
         switch (condition) {
             case 0b0000:
                 return "B.EQ";
