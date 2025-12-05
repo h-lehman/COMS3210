@@ -1,0 +1,224 @@
+// Henry Lehman : lehmanh
+// Gavin Nienke : gn13
+
+//use the -s flag to increase the stack memory size for more than 64 elements
+
+// MAIN
+    ADDI X0, XZR, #0       // X0 = a
+    ADDI X1, XZR, #64     // X1 = 64
+    BL fill
+    BL is_sorted
+    BL stoopid_sort
+    BL is_sorted
+    HALT
+
+// fill(int *a, int n)
+// Fills array a[0..n-1] with values (n-1-i).
+fill:
+    ADDI X2, XZR, #0                 // i = 0
+    SUBI X5, X1, #1             // X5 = n - 1 (used as base value)
+
+    fill_loop:
+        SUBS XZR, X2, X1            // compare i - n
+        B.GE end_fill               // if (i >= n) exit loop
+
+        LSL X3, X2, #3              // X3 = i * 8 (byte offset for a[i])
+        ADD X4, X0, X3              // X4 = &a[i]
+        SUB X6, X5, X2              // X6 = (n - 1) - i
+        STUR X6, [X4, #0]           // a[i] = X6
+
+        ADDI X2, X2, #1             // i++
+        B fill_loop
+
+    end_fill:
+        BR LR                       // return
+
+swap:
+    // Save return address in SP+32 (above array)
+    STUR X30, [SP, #32]       
+
+    // Compute addresses of a[i] and a[j]
+    LSL X3, X1, #3           // X3 = i * 8
+    ADD X3, X0, X3           // X3 = &a[i]
+
+    LSL X4, X2, #3           // X4 = j * 8
+    ADD X4, X0, X4           // X4 = &a[j]
+
+    // Swap a[i] and a[j]
+    LDUR X5, [X3, #0]        // X5 = a[i]
+    LDUR X6, [X4, #0]        // X6 = a[j]
+    STUR X6, [X3, #0]        // a[i] = a[j]
+    STUR X5, [X4, #0]        // a[j] = tmp
+
+    // Restore return address
+    LDUR X30, [SP, #32]      
+    BR LR
+
+max_index:
+    SUBI SP, SP, #8      // allocate stack space for saved LR
+    STUR X30, [SP, #0]   // save link register
+
+    // Load a[n] into X4
+    LSL X3, X1, #3       // multiply index by 8
+    ADD X3, X0, X3       // X3 = &a[n]
+    LDUR X4, [X3, #0]    // X4 = a[n]
+
+    // Load a[m] into X6
+    LSL X5, X2, #3
+    ADD X5, X0, X5       // X5 = &a[m]
+    LDUR X6, [X5, #0]    // X6 = a[m]
+
+    // Compare a[n] > a[m]
+    SUBS XZR, X4, X6
+    B.GT ngreater
+    ADDI X0, X2, #0   // X0 = m
+    B end_max_index
+
+    ngreater:
+        ADDI X0, X1, #0   // X0 = n
+    end_max_index:
+        LDUR X30, [SP, #0]   // restore link register
+        ADDI SP, SP, #8      // free stack space
+        BR LR
+
+find_largest:
+    //prolog
+    SUBI SP, SP, #64          // Allocate 64 bytes for this frame
+    STUR FP, [SP, #0]         // Save old FP at SP
+    STUR LR, [SP, #8]         // Save old LR just above FP
+    ADDI FP, SP, #0           // Set new FP to point at saved FP
+
+    //Check base case: size == 1 --> return start;
+    SUBIS XZR, X2, #1          // sets flags based on (size - 1)
+    B.GT recurse        // if(size !- 1) --> do recursive call
+    ADDI X0, X1, #0            // Put start value in return register X0 = start
+    B end_find_largest         // skip to end
+
+    recurse:
+        //Find our midpoints
+        LSR X3, X2, #1            // X3 = size / 2
+        ADDI X4, X2, #1           
+        LSR X4, X4, #1            // X4 = (size + 1) / 2
+
+        //Save caller register values
+        STUR X0, [SP, #16]        // Save a
+        STUR X1, [SP, #24]        // Save start
+        STUR X2, [SP, #32]        // Save size
+        STUR X3, [SP, #40]        // Save size / 2
+        STUR X4, [SP, #48]        // Save (size + 1) / 2
+
+        //Call find_largest(a, start, size / 2)
+        LDUR X0, [SP, #16]         // X0 = a
+        LDUR X1, [SP, #24]         // X1 = start
+        LDUR X2, [SP, #40]         // X2 = size / 2
+        BL find_largest
+        STUR X0, [SP, #56]         // Save left_result =5, X0, #0     
+
+        //Call find_largest(a, start + size / 2, (size + 1) / 2)
+        LDUR X0, [SP, #16]         // X0 = a
+        LDUR X1, [SP, #24]         // X1 = start
+        LDUR X3, [SP, #40]         // X3 = size/2
+        ADD X1, X1, X3             // start + size/2
+        LDUR X2, [SP, #48]         // X2 = (size+1)/2
+        BL find_largest
+        ADDI X6, X0, #0            // Save right_result = X6
+
+        //Call max_index(a, left_result, right_result) ---
+        LDUR X0, [SP, #16]         // X0 = a'
+        LDUR X1, [SP, #56]         // X1 = left_result
+        ADDI X2, X6, #0            // X2 = right_result
+        BL max_index
+
+    end_find_largest:
+        //epilog
+        LDUR FP, [SP, #0]         // Restore old FP
+        LDUR LR, [SP, #8]         // Restore old LR
+        ADDI SP, SP, #64          // Deallocate 64-byte frame (move SP back up)
+        BR LR                     // Return to caller
+
+stoopid_sort:
+    // Prolog
+    SUBI SP, SP, #64        // allocate stack space
+    STUR FP, [SP, #0]       // save old FP
+    STUR LR, [SP, #8]       // save old LR
+    STUR X20, [SP, #16]     // save a
+    STUR X21, [SP, #24]     // save size
+    STUR X19, [SP, #32]     // save i
+    ADDI FP, SP, #0         // new FP          
+
+    ADDI X19, XZR, #0      // i = 0
+    ADDI X20, X0, #0      // X20 = a
+    ADDI X21, X1, #0      // X21 = size
+    
+    ss_for_loop:
+        // Check if i < size - 1
+        SUBI X0, X21, #1         // size - 1
+        SUBS XZR, X19, X0        // i - (size - 1)
+        B.GE ss_end_loop        // if i >= size - 1, exit loop
+        
+
+        // n = find_largest(a, 0, size - i);
+        ADDI X0, X20, #0        // X0 = a
+        ADDI X1, XZR, #0        // X1 = 0
+        SUB X2, X21, X19        // X2 = size - i
+        BL find_largest         // X0 = n = return value
+        
+
+        // swap(a, n, size - i - 1);
+        ADDI X1, X0, #0        // X1 = n
+        ADDI X0, X20, #0       // X0 = a
+        SUB X2, X21, X19       // X2 = size - i 
+        SUBI X2, X2, #1        // X2 = size - i - 1
+        BL swap
+        
+
+        // i++
+        ADDI X19, X19, #1
+        B ss_for_loop
+
+    ss_end_loop:
+        //  Epilog 
+        LDUR FP, [SP, #0]       // restore FP
+        LDUR LR, [SP, #8]       // restore link register
+        LDUR X20, [SP, #16]     // save a
+        LDUR X21, [SP, #24]     // save size
+        LDUR X19, [SP, #32]     // restore i
+        ADDI SP, SP, #64        // deallocate
+        BR LR
+
+// returns 0 if array not sorted, 1 if sorted
+is_sorted:
+    SUBI SP, SP, #16
+    STUR X30, [SP, #0]     // save LR
+    STUR X19, [SP, #8]     // save i
+
+    LDUR X4, [X0, #0]      // previous = a[0]
+    ADDI X19, XZR, #1      // i = 1
+
+    sorting_loop:
+        SUBS XZR, X19, X1      // i - size
+        B.GE sorted             // if i >= size, array is sorted
+
+        LSL X3, X19, #3        // offset = i * 8
+        ADD X3, X0, X3
+        LDUR X5, [X3, #0]      // current = a[i]
+
+        SUBS XZR, X5, X4       // current - previous
+        B.LT not_sorted         // if current < previous
+
+        ADDI X19, X19, #1      // i++
+        ADD X4, X5, XZR        // previous = current
+        B sorting_loop
+
+    not_sorted:
+        ADDI X0, XZR, #0       // return 0
+        B end_is_sorted
+
+    sorted:
+        ADDI X0, XZR, #1       // return 1
+
+    end_is_sorted:
+        LDUR X19, [SP, #8]
+        LDUR X30, [SP, #0]
+        ADDI SP, SP, #16
+        BR LR
