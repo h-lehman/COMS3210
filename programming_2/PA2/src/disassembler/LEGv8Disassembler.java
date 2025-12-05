@@ -7,23 +7,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The LEGv8Disassembler class reads a file containing LEGv8 machine code,
- * decodes them, and prints the disassembled instructions with labels. The Emulator creates
- * a program.legv8asm.machine file containing the binary code. The disassembler reads this file
- * and decodes the instructions in a LEGv8 program that is run-able in the emulator.
+ * This LEGv8Disassembler takes in a file and reads the machine code. It decodes and prints the corresponding assembly 
+ * code. 
  */
 public class LEGv8Disassembler {
 
     private static int count = 1; // Instruction count for labeling
 
     /**
-     * Reads LEGv8 instructions from a file and returns them as an array of integers.
+     * Reads machineCode file and turns it into integers. 
      *
      * @param filename The name of the file containing LEGv8 instructions.
      * @return An array of integers representing the instructions.
      * @throws IOException If an error occurs while reading the file.
      */
-    public static int[] readBinaryInstructions(String filename) throws IOException {
+    public static int[] readMachineCode(String filename) throws IOException {
         // Read all bytes while ensuring proper file closure
         byte[] bytes;
         try (InputStream is = Files.newInputStream(Paths.get(filename))) {
@@ -65,9 +63,11 @@ public class LEGv8Disassembler {
         }
 
         try {
-            int[] program = readBinaryInstructions(args[0]);
+            int[] program = readMachineCode(args[0]);
             List<Instruction> instructionList = new ArrayList<>(); // Store all instructions
 
+
+            //First pass to calculate label length
             for (int i = 0; i < program.length; i++) {
                 Instruction instruction = new Instruction(program[i], count);
                 InstructionDecoder decoder = new InstructionDecoder(instruction);
@@ -76,7 +76,7 @@ public class LEGv8Disassembler {
                 count++;
             }
 
-            // Second pass, print with labels
+            // Second pass to print instructions with labels
             for (Instruction instr : instructionList) {
                 // Print label if this is a branch target
                 boolean isBranchTarget = instructionList.stream().anyMatch(i -> i.getBranchTarget() == instr.getCount());
